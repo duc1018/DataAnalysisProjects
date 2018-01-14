@@ -1,0 +1,949 @@
+---
+title: "Prosper_Loan_Trend"
+author: "Duc"
+date: "January 1, 2018"
+output:
+  html_document:
+    keep_md: yes
+    toc: yes
+    toc_depth: 3
+    toc_float: yes
+---
+#Introduction
+
+The objective of this project is to determine what factors help the loan \
+applicants have more investments. By exploring the relationship between the \
+number of investors and total trades, we would be able to make  the customers' \
+loan applicant more appealing to their investors.
+
+The data set is obtained from the following link:
+https://docs.google.com/document/d/1qEcwltBMlRYZT-l699-71TzInWfk4W9q5rTCSvDVMpc/pub?embedded=true
+  
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(echo=FALSE, warning=FALSE, message=FALSE)
+```
+
+
+```{r, echo = FALSE}
+knitr::opts_chunk$set(
+  fig.path = "Images"
+)
+```
+
+# Load Data and neccessary package
+
+```{r message=FALSE, warning=FALSE}
+setwd("D:/data_base")
+L <- read.csv("prosperLoanData.csv" )
+```
+
+
+Let create a copy of L
+```{r }
+Loan <- cbind(L)
+```
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, packages}
+library(ggplot2)
+library(plyr)
+library(gridExtra)
+library(dplyr)
+library(reshape2)
+library(memisc)
+library(GGally)
+library(scales)
+```
+
+#Univariate Plots Section
+
+```{r - explore the data}
+dim(Loan)
+```
+
+```{r}
+#summary(Loan)
+```
+Notes:
+
+The data Set contains 46 variables with 113937 observations.
+
+
+```{r - explore the number of investors for the Loan}
+summary(Loan$Investors)
+```
+
+
+```{r}
+p1 <- ggplot(aes(x = Investors), data = Loan) + 
+     geom_histogram(binwidth = 30 ,boundary = 0.5,  fill = I('blue'), 
+     color = I('red')) +
+     scale_x_continuous(breaks = c(1,250,500,750,1000,1200)) + 
+     ggtitle("Investors_Histogram")                                                           
+
+
+grid.arrange(p1)
+```
+
+The histogram seems to be skewed to the right.Also, the mean is much larger \
+than the median. This suggests that there is an outlier in this data set. 
+\ Perhaps, the number of investors with the value of 1 is the outlier. \
+In addition, there are very few values that have large X values. 
+
+
+
+
+Let confirm that the outlier occurs at Investors of the value of 1.
+```{r}
+t <- table(Loan$Investors)
+sort(t, decreasing = T)[1]
+```
+
+Since 1 has the most count, it is an outlier in Investor with the value of 1.\
+Except for the outlier, the rest of the distribution seems to be normal.
+
+Let examine this outlier graphically.
+
+```{r}
+grid.arrange( ggplot(aes(x= Investors), 
+        data = Loan) +
+  geom_histogram( bins = 30) ,
+   ggplot(aes(x=1, y=Investors), 
+        data = Loan) +
+  geom_boxplot( )  , nrow =1)
+
+```
+
+
+
+
+The boxplot shows that we have an outlier. It is necessary to transform the \
+Investors variables to near normality.
+
+
+```{r }
+ggplot(aes(x = Investors), data = Loan) + 
+     geom_histogram(binwidth = 0.265,boundary = 0.5,  fill = I('light blue'), 
+                    color = I('red')) +
+     scale_x_log10(breaks = c(1,250,500,750,1200)) + 
+     scale_y_sqrt()+
+     ggtitle("Investors(log10)")     
+```
+
+Transformed the long tail data to have a better understanding of the \
+distribution of Investors. The transformed Investors distribution appears to \
+approximately normal. Even though the outlier is still there, we use the median \
+mean to analyze the Total trades-Investors trends
+
+```{r - TotalTrades}
+summary(Loan$TotalTrades)
+```
+
+Notice there are still missing values in Total Trades. We will replace them with \
+the mean of column TotalTrades.
+
+```{r}
+m <-mean(Loan$TotalTrades, na.rm=TRUE)
+Loan$TotalTrades[is.na(Loan$TotalTrades)] <- m
+```
+
+```{r}
+summary(Loan$TotalTrades)
+```
+
+Hence, all the missing values are replaced with the mean of Total Trades. 
+
+```{r - TotalTrades Plot}
+ggplot(aes(x = TotalTrades), data = Loan) + 
+     geom_histogram(binwidth = 0.5 ,boundary = 0.5,  fill = I('light green'), 
+                    color = I('red')) +
+     scale_x_sqrt(breaks = seq(0,130,10)) + scale_y_sqrt()+
+     ggtitle("TotalTrades")
+```
+
+Because Totaltrade is filled with its mean, approximately 23.23, this value \
+has the most count and is associated with the high peak in the plot. The mean \
+and median are approximately normal. In addition to the graph, the distribution \
+of total trade is approximately normal.
+
+
+
+
+Let examine how the histograms look like accross the categoriacal variable \
+of IncomeRange,  IsBorrowerHomeowner, EmploymentStatus.
+
+
+```{r}
+levels(Loan$IncomeRange)
+```
+
+The level of IncomeRange is not in ordered. The "$75,000-99,999" comes after the "100,000+"
+
+```{r - Let adjust the order of Income Range}
+Inrange <- c("$0","$1-24,999", "$25,000-49,999","$50,000-74,999",  
+             "$75,000-99,999","$100,000+","Not displayed", "Not employed" )
+Loan$IncomeRange <- factor(Loan$IncomeRange, levels = Inrange,ordered =  T)
+                                                        
+```
+
+To avoid the overlapping x labels, the income re-labeled with the plus signs. \
+"+" to indicate the range. For example, 25,000+ show  the range between  \
+25,000-49,999
+
+```{r}
+C <- c("0","1+","25,000+", "50,000+", "75,000+", "100,000+","Not displayed",
+       "Unemployed" )
+ggplot(aes(x = IncomeRange), data = Loan) + stat_count(width = 0.5) +
+  xlab('IncomeRange') +
+  scale_x_discrete(labels = C)
+```
+
+Most of the income ranges are in 25,000-24,999 and 50,000-74,9999. There are \
+very few people with unemployed status and zero income. Now let examine \
+Occupation
+
+```{r - IsBorrowerHomeowner}
+ggplot(aes(x = IsBorrowerHomeowner), data = Loan) + stat_count()
+
+```
+
+
+There are as many homeowners as none home owners. So data will be in favor of \
+neither group.
+
+
+```{r - EmploymentStatus}
+ggplot(aes(x = EmploymentStatus), data = Loan) + geom_bar() + coord_flip()
+
+```
+
+
+There are some people leave their employment status empty. We will graph the \
+plot again without empty employment status.
+
+```{r  }
+Non_NA_Status <- subset(Loan, Loan$EmploymentStatus != "")
+ggplot(aes(x = EmploymentStatus), data = Non_NA_Status) + 
+  geom_bar() + coord_flip() + ggtitle('Employment Status Ommitting NA')
+```
+
+```{r}
+summary(Loan$EmploymentStatus)
+```
+
+Most of the applicants are employed, and there are very few that leaves their \
+employment status blank.
+
+
+# Univariate Analysis
+### What is the structure of your dataset?
+There are 1113937 listing with 81 variable.The variable EmploymnetStattus, \
+IsBorrowerHomeowner,Occupation, are factor variable, except for IncomeRange, \
+It is ordered factor variable.
+
+1. Some Observation:
+    + The median investors are 44.00 and the max number of investers is 1189
+    + There is outlier at Investor of the value 1
+    + This outlier is good data in extreme case
+    + We will use medians to examine the Totaltrade-Investor trend
+    + The missing values in Totaltrade are replaced with its means,23.33
+    + The amount of homeoweners and non-homeowner are approximately equal.
+    + The majority of applicant are employed.
+    + Most of the income ranges are in 25,000-24,999 and 50,000-74,9999
+    
+### What is/are the main feature(s) of interest in your dataset?
+The data set's main feature is Investors and TotalTrades. The objective is to determine \
+which factors are best for preditiing the number of Investors for the loans.
+
+### What other features in the dataset do you think will help support your \
+investigation into your feature(s) of interest?
+
+The TotalTrades with the combination of other variables, such as Income Range,\
+Employment Status, and home owners, can be used to predict a model to Investors numbers.
+
+### Did you create any new variables from existing variables in the dataset?
+I have not created any new variable
+
+### Of the features you investigated, were there any unusual distributions? \
+Did you perform any operations on the data to tidy, adjust, or change the form \
+of the data? If so, why did you do this?
+
+The right-skewed distribution of Investors is log-transformed and square root \
+transformed at x, y-axis respectively. The distribution is approximately normal \
+except for the outlier at Investors of value 1.
+
+
+# Bivariate Plots Section
+
+Let examine the correlation between the variable
+
+Create a subset data frame of Loan, that contains the variable of interest
+
+
+```{r}
+colum_name <- c('Investors','TotalTrades','EmploymentStatus',
+                'IsBorrowerHomeowner','IncomeRange')
+L2 <- Loan[c(colum_name)]
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+set.seed(20022012)
+Loan_samp <- L2[sample(1:length(L2$Investors),1000),]
+ggpairs(Loan_samp, wrap = c(shape = I('.'), outlier.shape = I('.')))+
+  theme(
+        axis.ticks = element_blank(),
+        axis.text = element_blank())
+ggsave('ggpair.png')
+```
+
+
+
+There is a positive correlation,0.106 between Total trades and Investors, in a small \
+sample. Probably, this relationship still hold in large sample
+
+
+
+
+```{r - explore Investors and TotalTrades Relationship}
+t1 <- ggplot(data = Loan, aes(x = TotalTrades, y = Investors)) + 
+  geom_point(alpha = 0.3, size = 1) +
+  scale_x_continuous(breaks = c(0,15,30,50,100,130))
+t1
+
+```
+
+
+Notes:
+The total trades that have the most investors are in the range of 15 to 30. \
+The numbers of Investors start decreasing after passing approximately 30 trades.\
+Let examine the correlation between TotalTrades and Investors.
+
+
+
+```{r - correlation function}
+correlation <- function(df,col1, col2) {
+  # return correlation of two variable in two decimal
+  # df$col1 seems not to work in fuction, we have to convert it into vectors
+  v1 <- unlist(df[,col1], use.names=FALSE)
+  v2 <- unlist(df[,col2], use.names=FALSE)
+  sum_list <- cor.test(v1,v2)
+  result<- round(sum_list$estimate,3)
+  return(result)
+} 
+```
+
+
+
+
+```{r }
+cor_Trade_Investors <- correlation(Loan,'TotalTrades', 'Investors')
+cat('cor_Trade_Investors =',cor_Trade_Investors)
+
+```
+```{r - Liear Model for Investor and ToatlTrades}
+m1 <- lm(Investors ~ TotalTrades, data = Loan)
+mtable(m1)
+```
+
+In the summary; There is no linear relationship between two variables.\ 
+Let examine the total trade and Investors graph again, with the linear regression\
+line
+
+```{r}
+e1 <- t1 + geom_smooth(method = 'lm', se = FALSE, size = 1, color = I('red'))
+grid.arrange(e1)
+```
+
+The linear line is nearly horizontally. Along with the correlation coefficience\,
+it may indicate that Total trades and Investors do not have the linear relationship.
+
+
+
+However, We can still examine how the numbers of Investors vary in \
+different numbers of trades.
+
+Let group Investors by numbers of TotalTrade
+
+```{r}
+L.invest_by_trade <- Loan %>%
+  group_by(TotalTrades) %>%
+  summarise(Mean_Investors = mean(Investors),
+            Median_Investors = median(Investors),
+            n = n()) %>%
+  arrange(TotalTrades)
+  
+
+```
+
+
+```{r}
+head(L.invest_by_trade, 4)
+```
+
+Let plot the geom_line for the TotalTrades with  Mean_Investors. 
+
+```{r}
+ggplot(data = L.invest_by_trade, aes(x = TotalTrades, y = Mean_Investors)) + 
+  geom_line() +
+  scale_x_continuous(breaks = seq(0,130,10.5)) + 
+  ggtitle("Average Investor and Total Trades")
+```
+
+The average numbers of investors seem to be constant in TotalTrades between 0 and 73. \
+Approximately Between the 90 and 126, the Investor Mean decreases. \
+Let confirm this pattern with their correlation, in the subset where TotalTrades
+
+
+
+```{r}
+r1 <- correlation(subset(L.invest_by_trade, TotalTrades >= 94),'TotalTrades', 
+                  'Mean_Investors')
+r2 <- correlation(subset(L.invest_by_trade, TotalTrades < 94),'TotalTrades', 
+                  'Mean_Investors')
+cat('cor_Mean_Investors_at_least_Than_94 Trade =',r1,'\n')
+cat('cor_Mean_Investors_lessThan_94 Trade =',r2)
+```
+
+
+Perhaps, TotalTrades of at least 94 correlates with numbers of Investors. \
+We shall fit a linear regression model on the variables
+
+```{r - Liear Model for Investor and ToatlTrades at least 94}
+
+m2 <- lm(Mean_Investors ~ TotalTrades, data = subset(L.invest_by_trade, 
+                                                     TotalTrades >= 94) )
+mtable(m2)
+```
+
+The correlation -0.266 suggests that is the negative correlation between Mean_Investor, \
+and TotalTrades of at least 94. The R-squared implies that is 7.1 % in variance \
+in Mean Investors. Perhaps, TotalTrades and Investors correlates negatively with \
+each others , when total trades is are at least 94.
+
+```{r}
+atleast_94_trades <- subset(Loan, TotalTrades >= 94)
+s1 <- correlation(subset(Loan, TotalTrades >= 94),'TotalTrades', 'Investors')
+s2 <- correlation(subset(Loan, TotalTrades < 94),'TotalTrades', 'Investors')
+cat('cor_Investors_at_least_Than_94 Trade =',s1,'\n')
+cat('cor_Investors_lessThan_94 Trade =',s2)
+```
+
+The correlation -0.266 suggests that is the negative correlation between Mean_Investor, \
+and TotalTrades of at least 94. The R-squared implies that is 7.1 % in variance \
+in Mean Investors. Perhaps, TotalTrades and Investors correlates negatively with \
+each other, when total trades are are at least 94.
+
+
+
+Let examine how categorical features vary with Total Trades and Investors
+
+```{r}
+p1 <- ggplot(aes(x = EmploymentStatus, y = Investors), data = Non_NA_Status  ) + 
+  geom_boxplot(notch = TRUE) 
+p1
+```
+
+Notice there are some  Outliers in each category. Take a closer look at medians \
+of each category
+
+```{r}
+p1 + coord_cartesian(ylim = c(0,250)) +
+  stat_summary(fun.y = mean, geom = 'point',shape = 4)
+```
+
+Full-time Status has the highest median and average(x symbol), while other and \
+employed have the lowest medians.
+
+A Summary relationship between Investors and Employment Status
+
+```{r}
+b <- by(Non_NA_Status$Investors, Non_NA_Status$EmploymentStatus, summary)
+b
+```
+
+Not just median, full-time status has the largest average numbers of Investors. \
+Perhaps, Investors are more confident with the full-time applicants, because they \
+have the stable income. The other and employed status approximately have equal \
+median. Probably the status "other" and "employed" are vague. As a result, the \
+investors find it difficult to make the investment with them.
+
+
+Next, we'll look how homeowning status affects the number of investors.
+
+```{r}
+ggplot(aes(x = IsBorrowerHomeowner, y = Investors), data = Loan ) + 
+  geom_boxplot() + coord_cartesian(ylim = c(0,250))+
+  stat_summary(fun.y = mean, geom = 'point',shape = 4)
+```
+```{r}
+by(Loan$Investors, Loan$IsBorrowerHomeowner, summary)
+```
+
+Both the box plot and summary suggest that homeowners are more appealing to \
+investors. They have more investors on average and median than non-owner do. \
+Probably, their properties increase their credibility.
+
+
+
+Now, let exam the income range and Investors
+
+```{r}
+ggplot(aes(x = IncomeRange,y = Investors), data = Loan ) + geom_boxplot() + 
+  scale_x_discrete(labels = C) + coord_cartesian(ylim = c(0,200))+
+  stat_summary(fun.y = mean, geom = 'point',shape = 4)
+     
+```
+
+```{r}
+by(Loan$Investors, Loan$IncomeRange, summary)
+```
+
+The trend of this relation ship is quite strange. The applicants with zero \
+income have more investors on average than the rest of group.
+                                                                                                                   
+
+
+
+# Bivariate Analysis
+
+
+### Talk about some of the relationships you observed in this part of the \
+investigation. How did the feature(s) of interest vary with other features in \
+the dataset?
+
+Both the graph and the correlation suggests no relationship between total \
+trades and investors.  Then the relationship is investigated again with the \
+the average number of investors.
+
+As the number of trade increases, there is no variance in the number of \
+investors. The correlation of at most 94 trade and Investors are approximate \
+zero. However, the correlation between the number of investors of at least 94 \
+and Investor is around negative 0.3. The number suggests a negative \
+correlation between the two variables.
+
+Having the good employment status, such as full time, and property somehow \
+associates with the high number of investors. On the contrary, having zero \
+income have the most investors on average. This could be some practical \
+significance. Probably the applicants have brilliant business ideas.
+
+# Multivariate Plots Section
+
+
+
+```{r - Create a dataframe, that group TotalTrades with homeonwer}
+pf.L_by_trade_home <- Loan %>%
+  group_by(TotalTrades, IsBorrowerHomeowner) %>%
+  summarise(mean_Investors_count = mean(Investors),
+            median_Investors_count = median(Investors),
+            n = n()) %>%
+  ungroup() %>%
+  arrange(TotalTrades)
+```
+
+```{r}
+head(pf.L_by_trade_home)
+```
+
+
+Let examine how the homeowner capture the substantial differences in numbers of investor
+
+```{r}
+ ggplot(aes(x = TotalTrades, y = median_Investors_count),
+       data = pf.L_by_trade_home)+
+       geom_line(aes(color = IsBorrowerHomeowner))
+```
+
+The graph suggests that homeowners have the more total trades than their \
+counterparts. Also, the property owners have more investors than the ones who do not.\
+The above graph also indicates a property difference is largest for the applicant with at \
+least 90 trades. Let further explore how the homeowner status affects the relationship between TotalTrades and Investor
+
+
+The variable true and false have been repeated for each trade. \
+This new data frame will have one row for each trade, and then we put the \
+median investor count in True and False.
+
+```{r}
+pf.L_by_trade_home.wide <- dcast(pf.L_by_trade_home,
+                                  TotalTrades ~ IsBorrowerHomeowner, 
+                                  value.var = "median_Investors_count")
+head(pf.L_by_trade_home.wide, 5)
+```
+
+
+```{r}
+colSums(is.na(pf.L_by_trade_home.wide))
+```
+
+There are some total trades with don't have median_investors_count, \
+because they belong exclusively to the homeowner or non-homeowner group. \
+We will plot the ratio of the nonhomeowner to homeowner median_inestor_count
+
+```{r}
+p1 <- ggplot(aes(x = TotalTrades, y = False/True), 
+             data = na.omit(pf.L_by_trade_home.wide))+
+  geom_line()+
+  geom_hline(yintercept = 1, alpha = 0.5, linetype = 2) + 
+  ggtitle('Ratio Non Homeowner to Homeowner')
+
+p2 <- ggplot(aes(x = TotalTrades, y = True/False), 
+             data = na.omit(pf.L_by_trade_home.wide))+
+  geom_line()+
+  geom_hline(yintercept = 1, alpha = 0.5, linetype = 2) + 
+  ggtitle('Ratio Homeowner to Non Homeowner')
+
+grid.arrange(p1, p2, ncol = 1)
+```
+
+In the Homeowner to Nonhomeowner, total trade of at least 80, the homeowners \
+have twenty times as the non-home owners. \
+The non-homeowner to homeowner shows that non- homeowner has over five-time as \
+the homeowners, when their total trades range is between 70 and 80 trades. \
+In both graphs, the ratio of the trades below 80, almost matches the intercept. \
+This could mean that is no significance when the total trades are in that range.
+
+
+```{r}
+a <- subset(pf.L_by_trade_home.wide,!is.na(True))
+b <- subset(pf.L_by_trade_home.wide,!is.na(False))
+s1 <- correlation(a ,'TotalTrades', 'True')
+s2 <- correlation( b,'TotalTrades', 'False')
+cat('cor_Investors_Yes_home=',s1,'\n')
+cat('cor_Investors_No_home =',s2)
+
+```
+
+
+Surprisingly! there is the pattern in Investors and TotalTrades Relationship \
+when taking account of the homeowners. The TotalTrades have the positive correlation \
+with the Investors, if the applicants are the home owner. In contrast, it \
+is a negative correlation when applicants are the non-homeowner.
+
+```{r}
+dim(atleast_94_trades)
+```
+
+There are only 19 observations to show the negative correlation between \
+Investors and TotalTrades.There are very few TotalTrades with high values. \
+Adding Home owners status somehow solve that issue.\
+we will see how the Investor-TotalTrade improve with the third variable
+
+
+
+Next we shall explore how the employment status effect Investors and \
+TotalTrades's relationship
+
+First Create a - Create a dataframe, that group TotalTrades with EmploymentStatus
+```{r}
+pf.L_by_trade_employ <- Non_NA_Status %>%
+  group_by(TotalTrades, EmploymentStatus) %>%
+  summarise(mean_Investors_count = mean(Investors),
+            median_Investors_count = median(Investors),
+            n = n()) %>%
+  ungroup() %>%
+  arrange(TotalTrades)
+```
+```{r}
+head(pf.L_by_trade_employ,3)
+```
+
+
+
+```{r}
+ ggplot(aes(x = TotalTrades, y = median_Investors_count),
+       data = pf.L_by_trade_employ)+
+       geom_point() +  facet_wrap(~EmploymentStatus, ncol = 2)
+```
+
+The retired, Full-time, and self-employed seem to have strong correlation \
+with median_Investors_count.Let calculate to confirm their correlation
+
+
+Frist transform it to then we put the median investor count in employment status
+
+```{r}
+pf.L_by_trade_home.employ.w <- dcast(pf.L_by_trade_employ,
+                                  TotalTrades ~ EmploymentStatus, 
+                                  value.var = "median_Investors_count")
+head(pf.L_by_trade_home.employ.w, 5)
+```
+
+There are some missing values, let replace them with the columns mean
+
+
+```{r - replace Na with meanfunction}
+fillMean <- function(df) {
+  pf <- df
+  cM <- colMeans(pf, na.rm=TRUE)
+  indx <- which(is.na(pf), arr.ind=TRUE)
+  pf[indx] <- cM[indx[,2]]
+  return(pf)
+} 
+```
+
+
+
+```{r}
+pf.L_by_trade_home.employ.w <- fillMean(pf.L_by_trade_home.employ.w)
+```
+
+Check if there are any missing value
+```{r}
+any(is.na(pf.L_by_trade_home.employ.w))
+```
+
+Calculate the correlation
+
+
+```{r}
+a <- pf.L_by_trade_home.employ.w
+Name <- names(a)
+for(i in 2:ncol(a)){
+  name <- Name[i]
+  r1 <- correlation(a ,'TotalTrades', name)
+  cat("cor_",name,'_TotalTrade =  ',r1,'\n')
+}
+```
+
+It turns out that total trades in Employed and Full_Time status have the \
+highest correlation, compared to the remaining group.
+
+
+Now let examine the income ranges
+
+
+```{r}
+ ggplot(aes(x =  TotalTrades, 
+            y = Investors,
+            color = Loan$IncomeRange),
+       data = Loan)+
+  geom_point(alpha = 0.2, size = 1) +
+  geom_smooth(method = "lm", se = FALSE,size=2)+
+
+  ggtitle('Investors by TotalTrade and IncomeRange')
+```
+
+
+The zero income may be positively correlated with the number of investors, \
+as the red line looks increasing. The other lines, associated with other\
+income ranges, seem to be decreasing. \
+Let confirm this observation with correlation coefficient and graphs
+
+
+```{r}
+pf.L_by_trade_income <- Loan %>%
+  group_by(TotalTrades,IncomeRange) %>%
+  summarise(mean_Investors_count = mean(Investors),
+            median_Investors_count = median(Investors),
+            n = n()) %>%
+  ungroup() %>%
+  arrange(TotalTrades)
+```
+
+```{r}
+ ggplot(aes(x = TotalTrades, y = median_Investors_count),
+       data = pf.L_by_trade_income)+
+       geom_point() +  facet_wrap(~IncomeRange, ncol = 2)
+```
+
+
+The investors, with zero income and one hundred grand income group, seem to \
+increase as the trades increase
+
+Let calculate the correlation.
+
+```{r}
+pf.L_by_trade_home.income.w <- dcast(pf.L_by_trade_income,
+                                  TotalTrades ~ IncomeRange, 
+                                  value.var = "median_Investors_count")
+head(pf.L_by_trade_home.income.w, 5)
+```
+
+
+```{r}
+a <- pf.L_by_trade_home.income.w
+Name <- names(a)
+for(i in 2:ncol(a)){
+  name <- Name[i]
+  r1 <- correlation(a ,'TotalTrades', name)
+  cat("cor_",name,'_TotalTrade =  ',r1,'\n')
+}
+```
+
+The total trades of the income of at least 100,000  have positive \
+correlation 0.341. It is as close a zero income. 
+
+
+Let try to fit a Linear Model to this TotalTrades and Investors relationships \
+with all the variables, Income range, Employment Status and home owner status \
+because there is no correlation for total trades at most 94. We have to fit the \
+linear model for the at least 94 trades.
+
+```{r}
+m1 <- lm(Investors ~ TotalTrades, data = atleast_94_trades)
+m2 <- update(m1, ~. + IsBorrowerHomeowner)
+m3 <- update(m2, ~. + EmploymentStatus)
+m4 <- update(m3, ~. + IncomeRange)
+mtable(m1,m2,m3,m4)
+```
+The variable in this linear model can accounts for 47.4% of variance in the \
+number of investors.
+
+
+# Multivariate Analysis
+
+investigation. Were there features that strengthened each other in terms of \
+looking at your feature(s) of interest?
+
+The homeowner status reflects the relationship between Investors and Total trades \
+. There are very few data for high total trades values. As result, \
+the correlation between Investor and Total trades is zeros. After dividing the \
+total trade in two parts, we find that total trade with value at least 94 \
+is negatively correlated with the Investors. 
+
+By including homeowner status, the Investor-Total trades trend is noticeable. \
+For homeowner, it is positively correlated with the value of 0.26, \
+and -0.258 for the negative correlation. We can see the trend as whole without \
+dividing the total trades. 
+
+In this case the, total trades with nonhomeowner status increase as \
+the Investor decrease. The opposite effect is produced by total trades homeowner \
+status.
+
+### Were there any interesting or surprising interactions between features?
+
+We also apply the similar approach. We explore the Investor-Total trades trend \
+, with Employment status. There is a positive correlation between them, in the \
+the term of employment status. For example, the total trade in the employed status \
+has the correlation 0.288.
+
+
+In the same manner, the income range variable also illustrates the similar. \
+The income of at least 100,000 graphs and its correlation 0.341 suggests that \
+the investors increase as the total trade increase. However, total trades \
+with zeros, income seems to be strange, when it has the positive correlation.
+
+
+### OPTIONAL: Did you create any models with your dataset? Discuss the \
+strengths and limitations of your model.\
+The linear models with the R square 0.474, demonstrates how we can use the \
+variables to predict the Investor-Total trades trend. 
+
+# Final Plots and Summary
+### Plot One
+
+
+```{r}
+p1 <- ggplot(aes(x = Investors), data = Loan) + 
+     geom_histogram(binwidth = 0.265,boundary = 0.5,  fill = I('light green'), 
+                    color = I('red')) +
+     scale_x_log10(breaks = c(1,250,500,750,1200)) + 
+     scale_y_sqrt()+
+     ggtitle("Investors(log10)") 
+
+p2 <- ggplot(aes(x = Investors), data = Loan) + 
+     geom_histogram(binwidth = 30 ,boundary = 0.5,  fill = I('blue'), 
+                    color = I('red')) +
+     scale_x_continuous(breaks = c(1,250,500,750,1000,1200)) + 
+     ggtitle("Investors_Histogram")   
+grid.arrange(p2,p1 , ncol = 1)
+```
+
+### Description One
+
+Using number of investors as the resposne variable is problematic, beause \
+there is an outlier at investors of value of 1. In addition, there are very \
+few values of total trades with hight values. We transform the data to make it \
+look as normally distributed as possible.
+
+### Plot Two
+```{r }
+q1 <- ggplot(data = Loan, aes(x = TotalTrades, y = Investors)) + 
+  geom_point(alpha = 0.3, size = 1) +
+  scale_x_continuous(breaks = c(0,15,30,50,100,130))+
+  geom_smooth(method = 'lm', se = FALSE, size = 1, color = I('green')) +
+  ggtitle('Investor vs Total Trade')
+
+  
+  
+q2 <- ggplot(data = L.invest_by_trade, 
+             aes(x = TotalTrades, y = Mean_Investors)) + geom_line() +
+      scale_x_continuous(breaks = seq(0,130,10.5)) + 
+      ggtitle("Average Investor and Total Trades") +
+  geom_smooth(method = 'lm', se = FALSE, size = 1, color = I('blue'))
+grid.arrange(q1, q2, ncol = 1)
+```
+
+
+### Description Two
+Investor vs TotalTrades is produced from the data set. It does not seems to \
+resemble any pattern.  Next, the Average Investor and Total Trades graph does \
+show a lot of flunction in Mean investors. However both graph show the \
+decreasing pattern around the total trades of 94. The linear regression line in \
+each graph may suggest that two variables don not hold any linear relationship \
+because the lines seems to be horizontal.
+
+
+### Plot Three
+```{r}
+ ggplot(aes(x =  TotalTrades, 
+            y = Investors,
+            color = IsBorrowerHomeowner),
+       data = Loan)+
+  geom_point(alpha = 0.2, size = 1) +
+  geom_smooth(method = "lm", se = FALSE,size=2) +
+  stat_ellipse(type = "norm", linetype = 2,size=3) +
+  ggtitle('Median_Investors & Property Status')
+
+```
+
+### Description Three
+
+Adding one of the three variables makes the Investor - TotalTrade trend \
+noticeable. The total trades in the homeowning group increases as the investors \ 
+increases. 
+
+As the confidence curves, the ellipse shows that the majority of \
+homeowners and nonhomeowner are concentrated the total trade range \  
+between zero and fifty. 
+
+The two ellipses are not circular. This means that the TotalTrades and Investor \
+are correlated, in term of homeowning status.
+
+The slope of non-homeowner is slightly negative; this suggests that the  Total \
+Trade is negatively correlated with the numbers of Investors. The regression line\
+also illustrates that pattern.
+
+The slope of homeowner group is approximately constant. However the linear regression\
+line 's slope is slightly positive, for the homeowners with more trades. This can be \
+caused by the data collecting process. There are very few applicants with more \
+investors in the data set.
+
+# Reflection
+
+The objective of this project is using Investors as the response variable to measure how appealing \
+is the listing. The total trades variable is used as the predict the number of investors. 
+
+In the beginning, they do not correlate. The correlation coefficient is as low as zero. After splitting \
+the total trades at 94. We find that Investor-Total trend is negatively correlated,-0.299, Perhaps we \
+can use this subset to explore. However, there are only 19 observation, for the total trades of at \
+least 94.
+
+To solve this issue, we explore the Investor-total trade relationship in term of three variables, \
+income-range, employment, and homeowning status. Surprisingly, they display the increasing patterns.\
+Except for non-homeowner status, the trend is decreasing, with correlation coefficient -0.258.
+
+Perhaps, there are some problems with the data collections. It should be a better way to collect the data.
+
+
+
+#Acknowledgement
+
+Thank you Udacity project reviewers, my mentors, and staff. Below are the links I used to complete this project.
+
+https://stackoverflow.com/questions/25835643/replace-missing-values-with-column-mean
+
+http://www.okstate.edu/sas/v8/sashtml/insight/chap18/sect3.htm
+
+
